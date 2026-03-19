@@ -3,26 +3,45 @@ import numpy as np
 from datetime import datetime, timedelta
 
 # =========================================================
-# LIMPIEZA DE FECHAS (Súper robusta para Mes/Día/Año)
+# LIMPIEZA DE FECHAS (BLINDADA PARA DÍA/MES/AÑO LATINO)
 # =========================================================
 def to_date(x):
     if pd.isna(x): return None
     s = str(x).strip()
     
+    # 1. Quitamos la hora si viene en el texto (ej: "10/02/2026 14:30")
+    fecha_str = s.split(" ")[0]
+    
+    # Si viene como número interno de Excel
     if isinstance(x, (int, float)) and x > 30000:
         try: return (datetime(1899, 12, 30) + timedelta(days=float(x))).date()
         except: pass
         
-    # 1. Le quitamos la hora (ej: "02/10/2026 14:30" -> "02/10/2026")
-    fecha_str = s.split(" ")[0]
-    
-    try: 
-        # dayfirst=False obliga a Pandas a interpretar MM/DD/YYYY (Febrero 10)
-        return pd.to_datetime(fecha_str, dayfirst=False).date()
-    except: 
-        # Plan B: Intentar forzar día primero si algo falla
-        try: return pd.to_datetime(fecha_str, dayfirst=True).date()
-        except: return None
+    # --- INTENTO PRIMARIO: FORMATO LATINO ESTRICTO (Día/Mes/Año) ---
+    if "/" in fecha_str:
+        try:
+            # Obligamos a Python a leer Día primero, sin adivinar. 
+            # Funciona para "10/02/2026" y para "8/2/2026"
+            return datetime.strptime(fecha_str, "%d/%m/%Y").date()
+        except:
+            pass
+            
+    # --- INTENTO SECUNDARIO: FORMATOS CON GUIONES ---
+    if "-" in fecha_str:
+        # Si empieza con el año (ej: 2026-02-10)
+        if len(fecha_str.split("-")[0]) == 4:
+            try: return datetime.strptime(fecha_str, "%Y-%m-%d").date()
+            except: pass
+        # Si empieza con el día (ej: 10-02-2026)
+        else:
+            try: return datetime.strptime(fecha_str, "%d-%m-%Y").date()
+            except: pass
+            
+    # --- ÚLTIMO INTENTO DE RESPALDO ---
+    try:
+        return pd.to_datetime(fecha_str, dayfirst=True).date()
+    except:
+        return None
 
 def normalize_headers(df):
     df.columns = df.columns.astype(str).str.replace("﻿", "").str.replace("\ufeff", "").str.strip()
