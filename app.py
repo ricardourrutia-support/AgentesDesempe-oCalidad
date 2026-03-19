@@ -9,7 +9,7 @@ st.title("🟦 Consolidador CMI – Performance y Auditorías")
 
 st.markdown("""
 Sube los reportes operativos y pega los correos de los agentes. 
-La app consolidará las métricas de **Performance (Tickets)** y **Calidad (Auditorías)** exclusivamente para esos ejecutivos.
+La app consolidará las métricas de **Performance (Tickets)** y **Calidad (Auditorías)** exclusivamente para esos ejecutivos, **respetando el orden** en que los ingreses.
 """)
 
 col1, col2 = st.columns(2)
@@ -30,7 +30,7 @@ with col1:
 with col2:
     st.header("📧 Correos de Agentes")
     correos_input = st.text_area(
-        "Pega aquí los correos corporativos de los agentes a evaluar (puedes pegarlos desde Excel o separados por coma):",
+        "Pega aquí los correos corporativos de los agentes a evaluar (el reporte respetará este orden):",
         height=250,
         placeholder="ejemplo1@cabify.com\nejemplo2@cabify.com\nejemplo3@cabify.com"
     )
@@ -48,7 +48,7 @@ if st.button("🔄 Procesar Reportes"):
     lista_correos = [e.lower().strip() for e in raw_emails if "@" in e]
     
     if not lista_correos:
-        st.warning("⚠️ No pegaste ningún correo en la caja. Se procesarán todos los agentes encontrados en los reportes.")
+        st.warning("⚠️ No pegaste ningún correo en la caja. Se procesarán todos los agentes encontrados en los reportes (sin orden específico).")
 
     # === LECTURA DE ARCHIVOS ===
     try:
@@ -112,3 +112,5 @@ if st.button("🔄 Procesar Reportes"):
         file_name="CMI_Calidad_Agentes.xlsx", 
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+else:
+    st.info("Sube los archivos, selecciona rango de fechas y presiona **Procesar Reportes**.")
