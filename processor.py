@@ -2,23 +2,42 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 
+# =========================================================
+# UTILIDADES DE FECHAS (CON FORMATO LATAM %d/%m/%Y)
+# =========================================================
 def to_date(x):
     if pd.isna(x): return None
     s = str(x).strip()
+    
+    # Si viene como número Excel
     if isinstance(x, (int, float)) and x > 30000:
         try: return (datetime(1899, 12, 30) + timedelta(days=float(x))).date()
         except: pass
+        
+    # YYYY/MM/DD
     if "/" in s and len(s.split("/")[0]) == 4:
         try: return datetime.strptime(s, "%Y/%m/%d").date()
         except: pass
+        
+    # DD-MM-YYYY
     if "-" in s and len(s.split("-")[2]) == 4 and len(s.split("-")[0]) <= 2:
         try: return datetime.strptime(s, "%d-%m-%Y").date()
         except: pass
+        
+    # DD/MM/YYYY (Formato LATAM: Primero el día)
     if "/" in s and len(s.split("/")[2]) == 4:
-        try: return datetime.strptime(s, "%m/%d/%Y").date()
-        except: pass
-    try: return pd.to_datetime(s).date()
-    except: return None
+        try: 
+            return datetime.strptime(s, "%d/%m/%Y").date()
+        except:
+            # Plan B: Formato Gringo
+            try: return datetime.strptime(s, "%m/%d/%Y").date()
+            except: pass
+            
+    # Último intento forzado (priorizando el día primero)
+    try: 
+        return pd.to_datetime(s, dayfirst=True).date()
+    except: 
+        return None
 
 def normalize_headers(df):
     df.columns = df.columns.astype(str).str.replace("﻿", "").str.replace("\ufeff", "").str.strip()
@@ -31,6 +50,9 @@ def filtrar_rango(df, col, d_from, d_to):
     df = df[(df[col] >= d_from) & (df[col] <= d_to)]
     return df
 
+# =========================================================
+# PROCESO PERFORMANCE
+# =========================================================
 def process_performance(df, d_from, d_to):
     if df is None or df.empty: return pd.DataFrame()
     df = normalize_headers(df.copy())
@@ -60,6 +82,9 @@ def process_performance(df, d_from, d_to):
     out = df.groupby(["Correo Corporativo", "fecha"], as_index=False).agg({"Q_Encuestas": "sum", "CSAT": "mean", "NPS Score": "mean", "Firt (h)": "mean", "% Firt": "mean", "Furt (h)": "mean", "% Furt": "mean", "Q_Reopen": "sum", "Q_Tickets": "sum", "Q_Tickets_Resueltos": "sum"})
     return out.rename(columns={"NPS Score": "NPS", "Firt (h)": "FIRT", "% Firt": "%FIRT", "Furt (h)": "FURT", "% Furt": "%FURT"})
 
+# =========================================================
+# PROCESO AUDITORÍAS
+# =========================================================
 def process_auditorias(df, d_from, d_to):
     if df is None or df.empty: return pd.DataFrame()
     df = normalize_headers(df.copy())
@@ -78,17 +103,19 @@ def process_auditorias(df, d_from, d_to):
     out["Nota_Auditorias"] = out["Nota_Auditorias"].fillna(0)
     return out
 
-# === SISTEMA DE ORDENAMIENTO A PRUEBA DE BALAS ===
+# =========================================================
+# SISTEMA DE ORDENAMIENTO ESTRICTO
+# =========================================================
 def aplicar_orden(df, lista_correos):
     if len(lista_correos) > 0 and not df.empty:
-        # Quitamos duplicados manteniendo el orden
+        # Quitamos duplicados manteniendo el orden original de tu lista
         lista_unica = list(dict.fromkeys(lista_correos))
         orden_dict = {correo: index for index, correo in enumerate(lista_unica)}
         
         # Filtramos para asegurarnos de que solo queden los de la lista
         df = df[df["Correo Corporativo"].isin(lista_unica)].copy()
         
-        # Creamos una columna temporal secreta con el número del orden
+        # Creamos una columna temporal con el número del orden
         df["_orden_secreto"] = df["Correo Corporativo"].map(orden_dict)
         
         # Ordenamos la tabla usando ese número secreto
@@ -99,11 +126,14 @@ def aplicar_orden(df, lista_correos):
         else:
             df = df.sort_values(["_orden_secreto"])
             
-        # Borramos la columna secreta y reiniciamos el índice de Pandas (evita el error que te salió)
+        # Borramos la columna secreta y reiniciamos el índice
         df = df.drop(columns=["_orden_secreto"]).reset_index(drop=True)
         
     return df
 
+# =========================================================
+# CONSOLIDACIÓN
+# =========================================================
 def build_daily(df_list, lista_correos):
     merged = None
     for df in df_list:
@@ -171,6 +201,9 @@ def build_summary(df_daily, lista_correos):
     order = ["Correo Corporativo"] + [c for c in resumen.columns if c != "Correo Corporativo"]
     return resumen[order]
 
+# =========================================================
+# FUNCIÓN PRINCIPAL
+# =========================================================
 def procesar_reportes(df_performance, df_auditorias, lista_correos, d_from, d_to):
     perf = process_performance(df_performance, d_from, d_to)
     auds = process_auditorias(df_auditorias, d_from, d_to)
