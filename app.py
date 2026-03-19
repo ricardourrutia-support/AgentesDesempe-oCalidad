@@ -1,51 +1,56 @@
 import streamlit as st
 import pandas as pd
+import re
 from io import BytesIO
 from processor import procesar_reportes
 
-st.set_page_config(page_title="Consolidador CMI Aeropuerto", layout="wide")
-st.title("🟦 Consolidador CMI – Aeropuerto Cabify")
+st.set_page_config(page_title="Consolidador Calidad Aeropuerto", layout="wide")
+st.title("🟦 Consolidador CMI – Performance y Auditorías")
 
 st.markdown("""
-Sube los reportes correspondientes, selecciona el rango de fechas
-y la app consolidará **Ventas**, **Performance** y **Auditorías** por Agente.
+Sube los reportes operativos y pega los correos de los agentes. 
+La app consolidará las métricas de **Performance (Tickets)** y **Calidad (Auditorías)** exclusivamente para esos ejecutivos.
 """)
 
-st.header("📤 Cargar Archivos")
-col1, col2, col3 = st.columns(3)
+col1, col2 = st.columns(2)
+
 with col1:
-    ventas_file = st.file_uploader("Reporte de Ventas (.xlsx)", type=["xlsx"])
-with col2:
+    st.header("📤 Cargar Archivos")
     performance_file = st.file_uploader("Reporte de Performance (.csv)", type=["csv"])
-with col3:
-    auditorias_file = st.file_uploader("Reporte Auditorías (.csv ;)", type=["csv"])
+    auditorias_file = st.file_uploader("Reporte Auditorías (.csv)", type=["csv"])
+    
+    st.header("📅 Rango de Fechas")
+    colf1, colf2 = st.columns(2)
+    date_from = colf1.date_input("Desde:")
+    date_to = colf2.date_input("Hasta:")
+    if date_from > date_to:
+        st.error("❌ La fecha inicial no puede ser mayor que la final.")
+        st.stop()
 
-st.divider()
-
-st.header("📅 Seleccionar Rango de Fechas")
-colf1, colf2 = st.columns(2)
-date_from = colf1.date_input("Desde:")
-date_to = colf2.date_input("Hasta:")
-
-if date_from > date_to:
-    st.error("❌ La fecha inicial no puede ser mayor que la final.")
-    st.stop()
+with col2:
+    st.header("📧 Correos de Agentes")
+    correos_input = st.text_area(
+        "Pega aquí los correos corporativos de los agentes a evaluar (puedes pegarlos desde Excel o separados por coma):",
+        height=250,
+        placeholder="ejemplo1@cabify.com\nejemplo2@cabify.com\nejemplo3@cabify.com"
+    )
 
 st.divider()
 
 if st.button("🔄 Procesar Reportes"):
-    if not ventas_file or not performance_file or not auditorias_file:
-        st.error("❌ Debes cargar los 3 archivos operativos para continuar.")
+    if not performance_file or not auditorias_file:
+        st.error("❌ Debes cargar ambos reportes (Performance y Auditorías).")
         st.stop()
+        
+    # --- EXTRAER CORREOS DE LA CAJA DE TEXTO ---
+    # Usamos expresiones regulares para detectar cualquier correo sin importar cómo lo peguen
+    raw_emails = re.split(r'[,\s\n]+', correos_input.strip())
+    lista_correos = [e.lower().strip() for e in raw_emails if "@" in e]
+    
+    if not lista_correos:
+        st.warning("⚠️ No pegaste ningún correo en la caja. Se procesarán todos los agentes encontrados en los reportes.")
 
     # === LECTURA DE ARCHIVOS ===
-    try:
-        ventas_file.seek(0)
-        df_ventas = pd.read_excel(ventas_file)
-    except Exception as e:
-        st.error(f"Error leyendo Ventas: {e}")
-        st.stop()
-
     try:
         performance_file.seek(0)
         df_performance = pd.read_csv(performance_file, sep=";", encoding="utf-8-sig")
@@ -64,7 +69,7 @@ if st.button("🔄 Procesar Reportes"):
 
     # === PROCESAMIENTO ===
     try:
-        resultados = procesar_reportes(df_ventas, df_performance, df_auditorias, date_from, date_to)
+        resultados = procesar_reportes(df_performance, df_auditorias, lista_correos, date_from, date_to)
     except Exception as e:
         st.error(f"❌ ERROR DURANTE EL CRUCE: {e}")
         st.stop()
@@ -72,6 +77,10 @@ if st.button("🔄 Procesar Reportes"):
     df_diario = resultados["diario"]
     df_semanal = resultados["semanal"]
     df_resumen = resultados["resumen"]
+
+    if df_resumen.empty:
+        st.warning("⚠️ Las tablas están vacías. Verifica que los correos que pegaste coincidan con los de los reportes, o que el rango de fechas sea correcto.")
+        st.stop()
 
     st.success("✔ Reportes procesados correctamente.")
 
@@ -100,8 +109,6 @@ if st.button("🔄 Procesar Reportes"):
     st.download_button(
         "⬇ Descargar Excel Consolidado", 
         data=excel_bytes, 
-        file_name="CMI_Aeropuerto_Solo_Agentes.xlsx", 
+        file_name="CMI_Calidad_Agentes.xlsx", 
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-else:
-    st.info("Sube los archivos, selecciona rango de fechas y presiona **Procesar Reportes**.")
