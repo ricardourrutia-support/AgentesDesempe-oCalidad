@@ -46,7 +46,13 @@ def process_performance(df, d_from, d_to):
 
     df["Q_Encuestas"] = df.apply(lambda x: 1 if (not pd.isna(x.get("CSAT")) or not pd.isna(x.get("NPS Score"))) else 0, axis=1)
     df["Q_Tickets"] = 1
-    df["Q_Tickets_Resueltos"] = df["Status"].apply(lambda x: 1 if str(x).strip().lower() == "solved" else 0)
+    
+    # === AQUÍ ESTÁ LA MAGIA CORREGIDA ===
+    # Ahora cuenta como 1 si el status es 'solved' o 'closed'
+    df["Q_Tickets_Resueltos"] = df["Status"].apply(
+        lambda x: 1 if str(x).strip().lower() in ["solved", "closed"] else 0
+    )
+    
     df["Q_Reopen"] = pd.to_numeric(df.get("Reopen", 0), errors="coerce").fillna(0)
 
     for c in ["CSAT", "NPS Score", "Firt (h)", "Furt (h)", "% Firt", "% Furt"]: 
@@ -81,7 +87,7 @@ def build_daily(df_list, lista_correos):
 
     if merged is None or merged.empty: return pd.DataFrame()
 
-    # Filtramos la tabla maestra de inmediato usando los correos que pegó el usuario
+    # Filtramos la tabla maestra usando los correos que pegó el usuario
     if len(lista_correos) > 0:
         merged = merged[merged["Correo Corporativo"].isin(lista_correos)]
 
