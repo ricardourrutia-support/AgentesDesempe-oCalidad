@@ -62,31 +62,54 @@ if st.button("🔄 Procesar Reportes"):
         st.stop()
 
     # === LECTURA DINÁMICA DE ARCHIVOS ===
+    
+    # 1. LEER VENTAS
     try:
+        ventas_file.seek(0)
         df_ventas = pd.read_excel(ventas_file)
     except Exception as e:
         st.error(f"❌ Error leyendo Ventas: {e}")
         st.stop()
 
+    # 2. LEER PERFORMANCE (A prueba de balas ; y ,)
     try:
-        df_performance = pd.read_csv(performance_file, sep=",", encoding="utf-8")
+        performance_file.seek(0)
+        df_performance = pd.read_csv(performance_file, sep=";", encoding="utf-8-sig")
+        if len(df_performance.columns) < 5:  # Si lee todo en 1 columna, forzar el except
+            raise ValueError("Separador incorrecto")
     except:
-        try: df_performance = pd.read_csv(performance_file, sep=",", encoding="latin-1")
+        try: 
+            performance_file.seek(0)
+            df_performance = pd.read_csv(performance_file, sep=",", encoding="utf-8-sig")
         except Exception as e:
             st.error(f"❌ Error leyendo Performance: {e}")
             st.stop()
 
+    # 3. LEER AUDITORÍAS (A prueba de balas ; y ,)
     try:
         auditorias_file.seek(0)
         df_auditorias = pd.read_csv(auditorias_file, sep=";", encoding="utf-8-sig", engine="python")
-    except Exception as e:
-        st.error(f"❌ Error leyendo Auditorías: {e}")
-        st.stop()
+        if len(df_auditorias.columns) < 2:
+            raise ValueError("Separador incorrecto")
+    except:
+        try:
+            auditorias_file.seek(0)
+            df_auditorias = pd.read_csv(auditorias_file, sep=",", encoding="utf-8-sig", engine="python")
+        except Exception as e:
+            st.error(f"❌ Error leyendo Auditorías: {e}")
+            st.stop()
 
+    # 4. LEER AGENTES (A prueba de balas ; , o Excel)
     try:
-        # Soporte para la nueva planilla (por si la suben en CSV o Excel antiguo)
-        if agentes_file.name.endswith('.csv'):
-            df_agentes = pd.read_csv(agentes_file, sep=";", encoding="utf-8-sig", engine="python")
+        agentes_file.seek(0)
+        if agentes_file.name.endswith(('.csv', '.txt')):
+            try:
+                df_agentes = pd.read_csv(agentes_file, sep=";", encoding="utf-8-sig", engine="python")
+                if len(df_agentes.columns) < 2:
+                    raise ValueError("Separador incorrecto")
+            except:
+                agentes_file.seek(0)
+                df_agentes = pd.read_csv(agentes_file, sep=",", encoding="utf-8-sig", engine="python")
         else:
             df_agentes = pd.read_excel(agentes_file)
     except Exception as e:
@@ -106,7 +129,7 @@ if st.button("🔄 Procesar Reportes"):
             date_to
         )
     except Exception as e:
-        st.error(f"❌ Error interno al procesar datos: {e}")
+        st.error(f"❌ Error interno al procesar datos en processor.py: {e}")
         st.stop()
 
     df_diario = resultados["diario"]
