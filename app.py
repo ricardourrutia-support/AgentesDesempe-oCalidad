@@ -18,7 +18,7 @@ with col1:
     performance_file = st.file_uploader("Reporte de Performance (.csv)", type=["csv"])
 with col2:
     auditorias_file = st.file_uploader("Reporte Auditorías (.csv ;)", type=["csv"])
-    agentes_file = st.file_uploader("Planilla de Trabajadores (.csv o .xlsx o .xls)", type=["csv", "xlsx", "xls"])
+    agentes_file = st.file_uploader("Planilla Trabajadores (.xls, .xlsx, .csv)", type=["csv", "xlsx", "xls"])
 
 st.divider()
 
@@ -39,6 +39,8 @@ if st.button("🔄 Procesar Reportes"):
         st.stop()
 
     # === LECTURA DE ARCHIVOS ===
+    
+    # 1. VENTAS
     try:
         ventas_file.seek(0)
         df_ventas = pd.read_excel(ventas_file)
@@ -46,6 +48,7 @@ if st.button("🔄 Procesar Reportes"):
         st.error(f"Error leyendo Ventas: {e}")
         st.stop()
 
+    # 2. PERFORMANCE
     try:
         performance_file.seek(0)
         df_performance = pd.read_csv(performance_file, sep=";", encoding="utf-8-sig")
@@ -54,6 +57,7 @@ if st.button("🔄 Procesar Reportes"):
         performance_file.seek(0)
         df_performance = pd.read_csv(performance_file, sep=",", encoding="utf-8-sig")
 
+    # 3. AUDITORÍAS
     try:
         auditorias_file.seek(0)
         df_auditorias = pd.read_csv(auditorias_file, sep=";", encoding="utf-8-sig", engine="python")
@@ -62,17 +66,18 @@ if st.button("🔄 Procesar Reportes"):
         auditorias_file.seek(0)
         df_auditorias = pd.read_csv(auditorias_file, sep=",", encoding="utf-8-sig", engine="python")
 
+    # 4. AGENTES (Saltando las primeras 4 filas de formato)
     try:
         agentes_file.seek(0)
         if agentes_file.name.endswith(('.csv', '.txt')):
             try:
-                df_agentes = pd.read_csv(agentes_file, sep=";", encoding="utf-8-sig", engine="python")
+                df_agentes = pd.read_csv(agentes_file, sep=";", encoding="utf-8-sig", engine="python", skiprows=4)
                 if len(df_agentes.columns) < 2: raise ValueError()
             except:
                 agentes_file.seek(0)
-                df_agentes = pd.read_csv(agentes_file, sep=",", encoding="utf-8-sig", engine="python")
+                df_agentes = pd.read_csv(agentes_file, sep=",", encoding="utf-8-sig", engine="python", skiprows=4)
         else:
-            df_agentes = pd.read_excel(agentes_file)
+            df_agentes = pd.read_excel(agentes_file, skiprows=4)
     except Exception as e:
         st.error(f"Error leyendo Planilla de Trabajadores: {e}")
         st.stop()
@@ -96,15 +101,20 @@ if st.button("🔄 Procesar Reportes"):
 
     st.success("✔ Reportes procesados correctamente.")
 
+    # === MOSTRAR TABLAS ===
     st.header("👥 Resumen Desempeño por Coordinador")
     st.dataframe(df_coordinadores, use_container_width=True)
+    
     st.header("📊 Resumen Total Agentes")
     st.dataframe(df_resumen, use_container_width=True)
+    
     st.header("📆 Reporte Semanal")
     st.dataframe(df_semanal, use_container_width=True)
+    
     st.header("📅 Reporte Diario")
     st.dataframe(df_diario, use_container_width=True)
 
+    # === DESCARGA ===
     st.header("📥 Descargar Excel Consolidado")
     def to_excel(diario, semanal, resumen, coord):
         output = BytesIO()
@@ -117,6 +127,11 @@ if st.button("🔄 Procesar Reportes"):
         return output.getvalue()
 
     excel_bytes = to_excel(df_diario, df_semanal, df_resumen, df_coordinadores)
-    st.download_button("⬇ Descargar Excel Consolidado", data=excel_bytes, file_name="CMI_Aeropuerto.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    st.download_button(
+        "⬇ Descargar Excel Consolidado", 
+        data=excel_bytes, 
+        file_name="CMI_Aeropuerto_Consolidado.xlsx", 
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 else:
     st.info("Sube los archivos, selecciona rango de fechas y presiona **Procesar Reportes**.")
