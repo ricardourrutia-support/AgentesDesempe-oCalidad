@@ -107,7 +107,7 @@ def merge_agentes(df, agentes_df):
     agentes_df = normalize_headers(agentes_df.copy())
 
     if "Email De Contacto" not in agentes_df.columns:
-        raise KeyError("La columna 'Email De Contacto' no existe en la Planilla de Trabajadores.")
+        raise KeyError("La columna 'Email De Contacto' no existe en la Planilla de Trabajadores (revisa si es la fila correcta).")
 
     agentes_df["Email De Contacto"] = agentes_df["Email De Contacto"].astype(str).str.lower().str.strip()
     df["agente"] = df["agente"].astype(str).str.lower().str.strip()
@@ -129,7 +129,7 @@ def build_daily(df_list, agentes_df):
 
     if merged is None or merged.empty: return pd.DataFrame()
     merged = merge_agentes(merged, agentes_df)
-    if merged.empty: return pd.DataFrame() # Previene caídas si el merge descartó todo
+    if merged.empty: return pd.DataFrame() 
 
     merged = merged.sort_values(["fecha", "Email De Contacto"])
     for c in ["Q_Encuestas", "Q_Tickets", "Q_Tickets_Resueltos", "Q_Reopen", "Q_Auditorias", "Ventas_Totales", "Ventas_Compartidas", "Ventas_Exclusivas"]:
@@ -201,4 +201,4 @@ def procesar_reportes(df_ventas, df_performance, df_auditorias, agentes_df, d_fr
     resumen = build_summary(diario)
     coordinadores = build_coordinadores(diario)
 
-    return {"diario": diario, "semanal": semanal, "resumen": resumen, "coordinadores": coordinadores}
+    return {"diario": diario, "semanal": semanal, "resumen": resumen, "coordinadores": coordinadores}}
