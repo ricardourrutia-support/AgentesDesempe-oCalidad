@@ -47,8 +47,6 @@ def process_performance(df, d_from, d_to):
     df["Q_Encuestas"] = df.apply(lambda x: 1 if (not pd.isna(x.get("CSAT")) or not pd.isna(x.get("NPS Score"))) else 0, axis=1)
     df["Q_Tickets"] = 1
     
-    # === AQUÍ ESTÁ LA MAGIA CORREGIDA ===
-    # Ahora cuenta como 1 si el status es 'solved' o 'closed'
     df["Q_Tickets_Resueltos"] = df["Status"].apply(
         lambda x: 1 if str(x).strip().lower() in ["solved", "closed"] else 0
     )
@@ -79,6 +77,27 @@ def process_auditorias(df, d_from, d_to):
     out["Nota_Auditorias"] = out["Nota_Auditorias"].fillna(0)
     return out
 
+# === NUEVA FUNCIÓN PARA APLICAR EL ORDEN DEL USUARIO ===
+def aplicar_orden(df, lista_correos):
+    if len(lista_correos) > 0 and not df.empty:
+        # Convierte la columna en una categoría con el orden exacto de lista_correos
+        df["Correo Corporativo"] = pd.Categorical(
+            df["Correo Corporativo"], 
+            categories=lista_correos, 
+            ordered=True
+        )
+        # Ordena usando esa nueva categoría (y por fecha si aplica)
+        if "fecha" in df.columns:
+            df = df.sort_values(["fecha", "Correo Corporativo"])
+        elif "Semana" in df.columns:
+            df = df.sort_values(["Semana", "Correo Corporativo"])
+        else:
+            df = df.sort_values("Correo Corporativo")
+            
+        # Limpiamos los que quedaron fuera del filtro (los NaN generados por pd.Categorical si sobraban datos)
+        df = df.dropna(subset=["Correo Corporativo"])
+    return df
+
 def build_daily(df_list, lista_correos):
     merged = None
     for df in df_list:
@@ -87,23 +106,24 @@ def build_daily(df_list, lista_correos):
 
     if merged is None or merged.empty: return pd.DataFrame()
 
-    # Filtramos la tabla maestra usando los correos que pegó el usuario
     if len(lista_correos) > 0:
         merged = merged[merged["Correo Corporativo"].isin(lista_correos)]
 
     if merged.empty: return pd.DataFrame()
 
-    merged = merged.sort_values(["fecha", "Correo Corporativo"])
     for c in ["Q_Encuestas", "Q_Tickets", "Q_Tickets_Resueltos", "Q_Reopen", "Q_Auditorias"]:
         if c in merged.columns: merged[c] = merged[c].fillna(0).astype(int)
 
     for c in ["NPS", "CSAT", "FIRT", "%FIRT", "FURT", "%FURT", "Nota_Auditorias"]:
         if c in merged.columns: merged[c] = merged[c].round(2)
 
+    # Aplicamos el orden estricto
+    merged = aplicar_orden(merged, lista_correos)
+
     order = ["fecha", "Correo Corporativo"] + [c for c in merged.columns if c not in ["fecha", "Correo Corporativo"]]
     return merged[order]
 
-def build_weekly(df_daily):
+def build_weekly(df_daily, lista_correos):
     if df_daily.empty: return pd.DataFrame()
     df = df_daily.copy()
     meses = {1:"Enero",2:"Febrero",3:"Marzo",4:"Abril",5:"Mayo",6:"Junio",7:"Julio",8:"Agosto",9:"Septiembre",10:"Octubre",11:"Noviembre",12:"Diciembre"}
@@ -126,10 +146,13 @@ def build_weekly(df_daily):
     for c in ["NPS","CSAT","FIRT","%FIRT","FURT","%FURT","Nota_Auditorias"]:
         if c in weekly.columns: weekly[c] = weekly[c].round(2)
 
+    # Aplicamos el orden estricto
+    weekly = aplicar_orden(weekly, lista_correos)
+
     order = ["Semana", "Correo Corporativo"] + [c for c in weekly.columns if c not in ["Semana", "Correo Corporativo"]]
     return weekly[order]
 
-def build_summary(df_daily):
+def build_summary(df_daily, lista_correos):
     if df_daily.empty: return pd.DataFrame()
     agg = {"Q_Encuestas":"sum", "NPS":"mean", "CSAT":"mean", "FIRT":"mean", "%FIRT":"mean", "FURT":"mean", "%FURT":"mean", "Q_Reopen":"sum", "Q_Tickets_Resueltos":"sum", "Q_Auditorias":"sum", "Nota_Auditorias":"mean"}
     cols_to_agg = {k: v for k, v in agg.items() if k in df_daily.columns}
@@ -137,6 +160,9 @@ def build_summary(df_daily):
 
     for c in ["NPS","CSAT","FIRT","%FIRT","FURT","%FURT","Nota_Auditorias"]:
         if c in resumen.columns: resumen[c] = resumen[c].round(2)
+
+    # Aplicamos el orden estricto
+    resumen = aplicar_orden(resumen, lista_correos)
 
     order = ["Correo Corporativo"] + [c for c in resumen.columns if c != "Correo Corporativo"]
     return resumen[order]
@@ -146,7 +172,7 @@ def procesar_reportes(df_performance, df_auditorias, lista_correos, d_from, d_to
     auds = process_auditorias(df_auditorias, d_from, d_to)
 
     diario = build_daily([perf, auds], lista_correos)
-    semanal = build_weekly(diario)
-    resumen = build_summary(diario)
+    semanal = build_weekly(diario, lista_correos)
+    resumen = build_summary(diario, lista_correos)
 
     return {"diario": diario, "semanal": semanal, "resumen": resumen}
