@@ -65,8 +65,6 @@ def filtrar_rango(df, col, d_from, d_to):
 def process_performance(df, d_from, d_to):
     if df is None or df.empty: return pd.DataFrame()
     df = normalize_headers(df.copy())
-    if "Group Support Service" not in df.columns: return pd.DataFrame()
-    df = df[df["Group Support Service"] == "C_Ops Support"]
     if "Fecha de Referencia" not in df.columns:
         raise KeyError("Falta 'Fecha de Referencia' en Performance")
 
@@ -118,6 +116,7 @@ def process_performance(df, d_from, d_to):
 def process_auditorias(df, d_from, d_to):
     if df is None or df.empty: return pd.DataFrame()
     df = normalize_headers(df.copy())
+
     if "Date Time" not in df.columns:
         raise KeyError("Falta 'Date Time' en Auditorías")
 
